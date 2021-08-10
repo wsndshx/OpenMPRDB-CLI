@@ -55,7 +55,7 @@ func main() {
 						return err
 					}
 
-					log.Fatalln("服务器注册成功")
+					log.Println("服务器注册成功")
 					return nil
 				},
 			},
@@ -94,7 +94,41 @@ func main() {
 						return err
 					}
 
-					log.Fatalln("玩家数据提交成功")
+					log.Printf("玩家数据提交成功, 操作uuid: %s", uuid)
+					return nil
+				},
+			},
+			{
+				Name:  "delete",
+				Usage: "Delete the specified past submission.",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "submit",
+						Value:    "a5fac3b4-ff62-4...",
+						Usage:    "Specify the submitted uuid.",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "comment",
+						Value:    "revert ...",
+						Usage:    "Delete the reason for the submission.",
+						Required: true,
+					},
+				},
+				Action: func(c *cli.Context) error {
+					// 向中心服务器提交删除请求
+					err := deleteSubmit(c.String("submit"), c.String("comment"))
+					if err != nil {
+						return err
+					}
+
+					// 删除本地数据库中的记录
+					err = deleteSubmission(c.String("submit"))
+					if err != nil {
+						return err
+					}
+
+					log.Printf("提交 %s 删除成功!", c.String("submit"))
 					return nil
 				},
 			},
@@ -119,9 +153,9 @@ func Exists(path string) bool {
 	return true
 }
 
-// httpPUT 向指定接口发送数据, 返回得到的内容
-func httpPUT(Type, API string, data io.Reader) ([]byte, error) {
-	req, _ := http.NewRequest("PUT", serverAddress+API, data)
+// httpRequest 向指定接口以指定方法发送数据, 返回得到的内容
+func httpRequest(method, Type, API string, data io.Reader) ([]byte, error) {
+	req, _ := http.NewRequest(method, serverAddress+API, data)
 	req.Header.Add("Content-Type", Type)
 	res, err := http.DefaultClient.Do(req)
 	if err != nil {

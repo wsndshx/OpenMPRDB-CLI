@@ -92,3 +92,12 @@ func newSubmission(uuid, player_uuid, comment string, point int) error {
 	}
 	return nil
 }
+
+// deleteSubmission 删除数据库中指定的提交记录
+func deleteSubmission(uuid string) error {
+	_, err := db.Exec("DELETE FROM Submission WHERE uuid = ?", uuid)
+	if err != nil {
+		return err
+	}
+	return nil
+}

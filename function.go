@@ -28,7 +28,7 @@ func register(server_name string) (string, error) {
 	bytesData, _ := json.Marshal(register)
 
 	// PUT请求 [服务器地址]/v1/server/register
-	req, err := httpPUT("application/json", "/v1/server/register", bytes.NewBuffer(bytesData))
+	req, err := httpRequest("PUT", "application/json", "/v1/server/register", bytes.NewBuffer(bytesData))
 	var data struct {
 		Status string `json:"status"`
 		UUID   string `json:"uuid"`
@@ -58,7 +58,7 @@ func newSubmit(player, comment string, point int) (string, error) {
 	fmt.Println(message)
 
 	// PUT请求: [API服务器地址]/v1/submit/new
-	req, err := httpPUT("text/plain", "/v1/submit/new", bytes.NewBufferString(message))
+	req, err := httpRequest("PUT", "text/plain", "/v1/submit/new", bytes.NewBufferString(message))
 	var data struct {
 		Status string `json:"status"`
 		UUID   string `json:"uuid"`
@@ -75,4 +75,33 @@ func newSubmit(player, comment string, point int) (string, error) {
 	}
 
 	return data.UUID, nil
+}
+
+func deleteSubmit(uuid, comment string) error {
+	// 生成请求数据
+	message, err := GenerateSignedMessage(fmt.Sprintf("timestamp: %d\r\ncomment: %s", time.Now().Unix(), comment))
+	if err != nil {
+		return err
+	}
+
+	// PUT请求: [API服务器地址]/v1/submit/uuid/<submit_uuid>
+	req, err := httpRequest("DELETE", "text/plain", "/v1/submit/uuid/"+uuid, bytes.NewBufferString(message))
+	if err != nil {
+		return err
+	}
+	var data struct {
+		Status string `json:"status"`
+		UUID   string `json:"uuid"`
+		Reason string `json:"reason"`
+	}
+
+	// 序列化
+	err = json.Unmarshal(req, &data)
+	if err != nil {
+		return errors.New("序列化错误: " + err.Error())
+	}
+	if data.Status == "NG" {
+		return errors.New("中心服务器返回异常: " + data.Reason)
+	}
+	return nil
 }
