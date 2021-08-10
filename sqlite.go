@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -53,7 +54,7 @@ func InitializeDB() {
 	sql_table := `
     CREATE TABLE IF NOT EXISTS Server(
 		server_name TEXT NULL,
-		uuid TEXT NULL,
+		uuid TEXT NULL UNIQUE,
 		public_key TEXT NULL
 	);
 	`
@@ -79,7 +80,7 @@ func registerServer(server_name string, uuid string) error {
 	}
 	_, err = db.Exec("INSERT INTO Server (server_name, uuid, public_key) values(?,?,?)", server_name, uuid, pubkey)
 	if err != nil {
-		return err
+		return errors.New("本地数据库错误: " + err.Error())
 	}
 	return nil
 }
@@ -88,7 +89,7 @@ func registerServer(server_name string, uuid string) error {
 func newSubmission(uuid, player_uuid, comment string, point int) error {
 	_, err := db.Exec("INSERT INTO Submission (uuid, player_uuid, comment, point) values(?,?,?,?)", uuid, player_uuid, comment, point)
 	if err != nil {
-		return err
+		return errors.New("本地数据库错误: " + err.Error())
 	}
 	return nil
 }
@@ -97,7 +98,71 @@ func newSubmission(uuid, player_uuid, comment string, point int) error {
 func deleteSubmission(uuid string) error {
 	_, err := db.Exec("DELETE FROM Submission WHERE uuid = ?", uuid)
 	if err != nil {
-		return err
+		return errors.New("本地数据库错误: " + err.Error())
+	}
+	return nil
+}
+
+// serverList 吐出数据库Server表中的部分内容
+func serverList(c chan string) error {
+	rows, err := db.Query("SELECT server_name, uuid FROM Server")
+	if err != nil {
+		return errors.New("本地数据库错误: " + err.Error())
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var data struct {
+			uuid string
+			name string
+		}
+		err := rows.Scan(&data.name, &data.uuid)
+		if err != nil {
+			return errors.New("本地数据库错误: " + err.Error())
+		}
+		c <- fmt.Sprintf("%s\t|%s", data.uuid, data.name)
+	}
+	close(c)
+	return nil
+}
+
+// subList 吐出数据库Submission表中的所有内容
+func subList(c chan string) error {
+	rows, err := db.Query("SELECT * FROM Submission")
+	if err != nil {
+		return errors.New("本地数据库错误: " + err.Error())
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var data struct {
+			uuid        string
+			player_uuid string
+			comment     string
+			point       int
+		}
+		err := rows.Scan(&data.uuid, &data.player_uuid, &data.comment, &data.point)
+		if err != nil {
+			return errors.New("本地数据库错误: " + err.Error())
+		}
+
+		c <- fmt.Sprintf("%s\t|%s\t|   %d\t|%s", data.uuid, data.player_uuid, data.point, data.comment)
+	}
+	close(c)
+	return nil
+}
+
+// insertServer 插入新的服务器信息
+func insertServer(uuid, name, pubkey_path string) error {
+	// 读取本地公钥
+	pubkey, err := ioutil.ReadFile(pubkey_path)
+	if err != nil {
+		return errors.New("读取指定公钥错误: " + err.Error())
+	}
+
+	_, err = db.Exec("INSERT INTO Server (server_name, uuid, public_key) values(?,?,?)", name, uuid, string(pubkey))
+	if err != nil {
+		return errors.New("本地数据库错误: " + err.Error())
 	}
 	return nil
 }

@@ -24,13 +24,75 @@ func init() {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		log.Println("密钥文件生成成功, 请勿移除公钥文件(rsa-pub.pem)和私钥文件(rsa-priv.pem), 并且妥善保管相关副本")
 	}
 }
 
 func main() {
 	app := &cli.App{
-		Name: "OpenMPRDB-CLI",
+		Name:  "OpenMPRDB-CLI",
+		Usage: "好无聊（滚滚滚）",
 		Commands: []*cli.Command{
+			{
+				Name:  "list",
+				Usage: "列出一些东西，例如提交历史...",
+				Subcommands: []*cli.Command{
+					{
+						Name:    "submission",
+						Usage:   "List the history of the submission.",
+						Aliases: []string{"sub"},
+						Action: func(c *cli.Context) error {
+							err := submissionList()
+							if err != nil {
+								return err
+							}
+							return nil
+						},
+					},
+					{
+						Name:  "server",
+						Usage: "Make a list of trusted servers.",
+						Action: func(c *cli.Context) error {
+							// 这里列出server表的内容
+							err := listServers()
+							if err != nil {
+								return err
+							}
+							return nil
+						},
+					},
+				},
+			},
+			{
+				Name:  "import",
+				Usage: "Import and trust server-specific data.",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "pubkey",
+						Usage:    "Public key path.",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "uuid",
+						Usage:    "Server uuid",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:  "name",
+						Usage: "Server name",
+						Value: "Kuroneko",
+					},
+				},
+				Action: func(c *cli.Context) error {
+					// 将相应的信息存入数据库
+					err := trustServer(c.String("uuid"), c.String("name"), c.String("pubkey"))
+					if err != nil {
+						return err
+					}
+					log.Printf("信任服务器 %s 成功, 已存储对应的公钥\n", c.String("uuid"))
+					return nil
+				},
+			},
 			{
 				Name:  "register",
 				Usage: "Register this server on the central server.",
