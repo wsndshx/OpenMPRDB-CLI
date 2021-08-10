@@ -12,6 +12,7 @@ import (
 
 // initializationKey 初始化本地密钥
 func initializationKey() (err error) {
+	// 生成密钥
 	rsaKey, err := crypto.GenerateKey(" ", " ", "rsa", 2048)
 	if err != nil {
 		return
@@ -58,11 +59,8 @@ func SignatureData(text string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	unlockedKeyObj, err := privateKeyObj.Unlock([]byte(nil))
-	if err != nil {
-		return "", err
-	}
-	signingKeyRing, err := crypto.NewKeyRing(unlockedKeyObj)
+
+	signingKeyRing, err := crypto.NewKeyRing(privateKeyObj)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +81,7 @@ func EncryptSignMessage(text string) (string, error) {
 	if err != nil {
 		return "", errors.New("无法读取本地公钥: " + err.Error())
 	}
-	armor, err := helper.EncryptSignMessageArmored(string(pubkey), string(privkey), []byte(nil), text)
+	armor, err := helper.EncryptSignMessageArmored(string(pubkey), string(privkey), nil, text)
 	if err != nil {
 		return "", errors.New("生成签名错误: " + err.Error())
 	}

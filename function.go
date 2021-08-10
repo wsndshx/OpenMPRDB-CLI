@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"time"
+
+	uuid "github.com/satori/go.uuid"
 )
 
 // register 在中心服务器上注册本服务器
@@ -47,13 +50,12 @@ func register(server_name string) (string, error) {
 // newSubmit 在中心服务器上提交新玩家数据
 func newSubmit(player, comment string, point int) (string, error) {
 	// 生成请求数据
-	// message, err := GenerateSignedMessage(fmt.Sprintf("uuid: %s\ntimestamp: %d\nplayer_uuid: %s\npoints: %d\ncomment: %s\n", uuid.Must(uuid.NewV4(), nil).String(), time.Now().Unix(), player, point, comment))
-	message, err := GenerateSignedMessage("miao\n123")
+	message, err := GenerateSignedMessage(fmt.Sprintf("uuid: %s\r\ntimestamp: %d\r\nplayer_uuid: %s\r\npoints: %d\r\ncomment: %s", uuid.Must(uuid.NewV4(), nil).String(), time.Now().Unix(), player, point, comment))
 
-	fmt.Println(message)
 	if err != nil {
 		return "", err
 	}
+	fmt.Println(message)
 
 	// PUT请求: [API服务器地址]/v1/submit/new
 	req, err := httpPUT("text/plain", "/v1/submit/new", bytes.NewBufferString(message))
