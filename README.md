@@ -4,6 +4,17 @@ API文档: https://openmprdb.org/
 
 计划: https://www.processon.com/view/link/61115e3ae401fd5eeb80a3a9
 
+## 编译
+
+**该项目需要本地安装Golang(>=1.16)和GCC环境**
+
+```shell
+git clone https://github.com/wsndshx/OpenMPRDB-CLI.git
+cd OpenMPRDB-CLI
+go mod download
+go build
+```
+
 ## 使用说明
 
 在首次运行时, 会在程序所在目录下生成密钥, 公钥, 数据库文件, 因此请将程序放置在单独的文件夹中运行, 避免污染公共目录.
