@@ -24,13 +24,14 @@ func register(server_name string) (string, error) {
 	message, err := SignatureData("server_name: " + server_name)
 
 	// 读取本地公钥
-	pubkey, err := ioutil.ReadFile("rsa-pub.pem")
+	var pubkey string
+	err = db.QueryRow("SELECT public_key FROM Config").Scan(&pubkey)
 	if err != nil {
-		return "", errors.New("读取本地公钥错误: " + err.Error())
+		return "", errors.New("无法读取本地私钥: " + err.Error())
 	}
 
 	register["message"] = message
-	register["public_key"] = string(pubkey)
+	register["public_key"] = pubkey
 	bytesData, _ := json.Marshal(register)
 
 	// PUT请求 [服务器地址]/v1/server/register
@@ -267,7 +268,6 @@ func generateReport() {
 
 	// 写入数据
 	for b := range c4 {
-		// log.Printf("正在插入玩家[%s]的数据", b.player_uuid)
 		addReputation(b)
 		bar.Add(1)
 	}

@@ -40,7 +40,14 @@ func init() {
 	// 检查本地数据库是否存在
 	if !Exists(SqlPath) {
 		log.Println("数据库文件不存在, 将在默认位置初始化数据库文件")
+		// 初始化本地密钥
+		err := initializationKey()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Println("密钥文件生成成功, 请妥善保管相关副本")
 		InitializeDB()
+
 	}
 	var err error
 	// charset=utf 用于指示打开/新建文件时使用的字符编码类型
@@ -113,19 +120,28 @@ func InitializeDB() {
 	);
 	`
 	db.Exec(sql_table)
+
+	// 读取私钥
+	privkey, err := ioutil.ReadFile("rsa-priv.pem")
+	if err != nil {
+		log.Fatalf("获取私钥错误: %s", err)
+	}
+	// 读取公钥
+	pubkey, err := ioutil.ReadFile("rsa-pub.pem")
+	if err != nil {
+		log.Fatalf("获取公钥错误: %s", err)
+	}
+	// 存储
+	_, err = db.Exec("INSERT INTO Config (private_key, public_key) values(?,?)", privkey, pubkey)
+	if err != nil {
+		log.Fatalf("数据库错误: %s", err)
+	}
+
 }
 
 // registerServer 存储注册服务器时返回的uuid和服务器名称
 func registerServer(server_name string, uuid string) error {
-	pubkey, err := ioutil.ReadFile("rsa-pub.pem")
-	if err != nil {
-		return errors.New("无法读取本地公钥: " + err.Error())
-	}
-	privkey, err := ioutil.ReadFile("rsa-priv.pem")
-	if err != nil {
-		return errors.New("无法读取本地公钥: " + err.Error())
-	}
-	_, err = db.Exec("INSERT INTO Config (server_name, uuid, private_key, public_key) values(?,?,?,?)", server_name, uuid, privkey, pubkey)
+	_, err := db.Exec("UPDATE Config SET server_name = ?, uuid = ?", server_name, uuid)
 	if err != nil {
 		return errors.New("本地数据库错误: " + err.Error())
 	}

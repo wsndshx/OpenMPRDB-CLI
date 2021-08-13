@@ -35,31 +35,14 @@ func initializationKey() (err error) {
 
 // SignatureData 对指定文本进行签名, 返回签名后的内容
 func SignatureData(text string) (string, error) {
-	privkey, err := ioutil.ReadFile("rsa-priv.pem")
+	var privkey string
+	err := db.QueryRow("SELECT private_key FROM Config").Scan(&privkey)
 	if err != nil {
 		return "", errors.New("无法读取本地私钥: " + err.Error())
 	}
-	armored, err := helper.SignCleartextMessageArmored(string(privkey), nil, text)
+	armored, err := helper.SignCleartextMessageArmored(privkey, nil, text)
 	if err != nil {
 		return "", errors.New("签名时发生错误: " + err.Error())
 	}
 	return armored, nil
-}
-
-// EncryptSignMessage 对指定文本进行加密并签名
-func EncryptSignMessage(text string) (string, error) {
-	privkey, err := ioutil.ReadFile("rsa-priv.pem")
-	if err != nil {
-		return "", errors.New("无法读取本地私钥: " + err.Error())
-	}
-
-	pubkey, err := ioutil.ReadFile("rsa-pub.pem")
-	if err != nil {
-		return "", errors.New("无法读取本地公钥: " + err.Error())
-	}
-	armor, err := helper.EncryptSignMessageArmored(string(pubkey), string(privkey), nil, text)
-	if err != nil {
-		return "", errors.New("生成签名错误: " + err.Error())
-	}
-	return armor, nil
 }

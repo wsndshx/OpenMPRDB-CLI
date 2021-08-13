@@ -18,17 +18,7 @@ var serverAddress string = "https://test.openmprdb.org"
 var bar *progressbar.ProgressBar
 
 func init() {
-	// log.SetFlags(log.Ldate | log.Lshortfile)
-	// 检查本地密钥是否存在
-	if !Exists("rsa-priv.pem") {
-		log.Println("本地密钥文件不存在, 将在默认位置生成密钥文件")
-		// 初始化本地密钥
-		err := initializationKey()
-		if err != nil {
-			log.Fatalln(err)
-		}
-		log.Println("密钥文件生成成功, 请勿移除公钥文件(rsa-pub.pem)和私钥文件(rsa-priv.pem), 并且妥善保管相关副本")
-	}
+
 }
 
 func main() {
