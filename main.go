@@ -2,17 +2,20 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 
+	"github.com/schollz/progressbar/v3"
 	"github.com/urfave/cli/v2"
 )
 
 var SqlPath string = "./OpenMPRDB.db"
 var serverAddress string = "https://test.openmprdb.org"
+var bar *progressbar.ProgressBar
 
 func init() {
 	// log.SetFlags(log.Ldate | log.Lshortfile)
@@ -31,8 +34,34 @@ func init() {
 func main() {
 	app := &cli.App{
 		Name:  "OpenMPRDB-CLI",
-		Usage: "好无聊（滚滚滚）",
+		Usage: "一个简陋的客户端",
 		Commands: []*cli.Command{
+			{
+				Name:  "update",
+				Usage: "更新信誉信息",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "export",
+						Usage: "更新完成后将结果导出到文件中",
+					},
+				},
+				Action: func(c *cli.Context) error {
+					// 显示一个进度条, 防止时间过长
+					bar = progressbar.Default(1)
+					// 生成数据
+					generateReport()
+
+					// 输出一下
+					c1 := make(chan ReportList)
+					fmt.Println("\t\t玩家uuid\t\t|评分")
+					go reportList(c1)
+					for i := range c1 {
+						fmt.Println(fmt.Sprintf("%s\t|%.1f", i.player_uuid, i.point))
+					}
+					log.Println("已到达最底端")
+					return nil
+				},
+			},
 			{
 				Name:  "list",
 				Usage: "列出一些东西，例如提交历史...",
@@ -77,6 +106,11 @@ func main() {
 						Usage:    "Server uuid",
 						Required: true,
 					},
+					&cli.IntFlag{
+						Name:     "level",
+						Usage:    "Trust level. (1 ~ 5)",
+						Required: true,
+					},
 					&cli.StringFlag{
 						Name:  "name",
 						Usage: "Server name",
@@ -85,7 +119,7 @@ func main() {
 				},
 				Action: func(c *cli.Context) error {
 					// 将相应的信息存入数据库
-					err := trustServer(c.String("uuid"), c.String("name"), c.String("pubkey"))
+					err := trustServer(c.String("uuid"), c.String("name"), c.String("pubkey"), c.Int("level"))
 					if err != nil {
 						return err
 					}
@@ -117,7 +151,7 @@ func main() {
 						return err
 					}
 
-					log.Println("服务器注册成功")
+					log.Printf("服务器%s[%s]注册成功", c.String("server_name"), server_uuid)
 					return nil
 				},
 			},
@@ -131,9 +165,9 @@ func main() {
 						Usage:    "Specify the player's uuid.",
 						Required: true,
 					},
-					&cli.IntFlag{
+					&cli.Float64Flag{
 						Name:     "point",
-						Value:    -1,
+						Value:    0,
 						Usage:    "Specify the player's uuid.",
 						Required: true,
 					},
@@ -145,13 +179,13 @@ func main() {
 					},
 				},
 				Action: func(c *cli.Context) error {
-					uuid, err := newSubmit(c.String("player"), c.String("comment"), c.Int("point"))
+					uuid, err := newSubmit(c.String("player"), c.String("comment"), c.Float64("point"))
 					if err != nil {
 						return err
 					}
 
 					// 在数据库中存储提交数据
-					err = newSubmission(uuid, c.String("player"), c.String("comment"), c.Int("point"))
+					err = newSubmission(uuid, c.String("player"), c.String("comment"), c.Float64("point"))
 					if err != nil {
 						return err
 					}

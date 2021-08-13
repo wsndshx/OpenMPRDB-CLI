@@ -2,9 +2,7 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
-	"log"
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/ProtonMail/gopenpgp/v2/helper"
@@ -35,39 +33,17 @@ func initializationKey() (err error) {
 	return
 }
 
-// GenerateSignedMessage
-func GenerateSignedMessage(text string) (string, error) {
-	// 生成签名
-	PGPSignature, err := SignatureData(text)
-	if err != nil {
-		return "", errors.New("签名时发生错误: " + err.Error())
-	}
-
-	return fmt.Sprintf("-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA512\n\n%s\n%s", text, PGPSignature), nil
-}
-
 // SignatureData 对指定文本进行签名, 返回签名后的内容
 func SignatureData(text string) (string, error) {
 	privkey, err := ioutil.ReadFile("rsa-priv.pem")
 	if err != nil {
 		return "", errors.New("无法读取本地私钥: " + err.Error())
 	}
-
-	message := crypto.NewPlainMessage([]byte(text))
-
-	privateKeyObj, err := crypto.NewKeyFromArmored(string(privkey))
+	armored, err := helper.SignCleartextMessageArmored(string(privkey), nil, text)
 	if err != nil {
-		return "", err
+		return "", errors.New("签名时发生错误: " + err.Error())
 	}
-
-	signingKeyRing, err := crypto.NewKeyRing(privateKeyObj)
-	if err != nil {
-		return "", err
-	}
-
-	pgpSignature, err := signingKeyRing.SignDetached(message)
-	miao, _ := pgpSignature.GetArmored()
-	return miao, nil
+	return armored, nil
 }
 
 // EncryptSignMessage 对指定文本进行加密并签名
@@ -86,38 +62,4 @@ func EncryptSignMessage(text string) (string, error) {
 		return "", errors.New("生成签名错误: " + err.Error())
 	}
 	return armor, nil
-}
-
-// verifySignature 验证签名是否正确
-func verifySignature(text string, signature string) bool {
-	pubkey, err := ioutil.ReadFile("rsa-pub.pem")
-	if err != nil {
-		log.Fatalln(err)
-		return false
-	}
-
-	message := crypto.NewPlainMessage([]byte(text))
-	pgpSignature, err := crypto.NewPGPSignatureFromArmored(signature)
-	if err != nil {
-		log.Fatalln(err)
-		return false
-	}
-
-	publicKeyObj, err := crypto.NewKeyFromArmored(string(pubkey))
-	if err != nil {
-		log.Fatalln(err)
-		return false
-	}
-	signingKeyRing, err := crypto.NewKeyRing(publicKeyObj)
-	if err != nil {
-		log.Fatalln(err)
-		return false
-	}
-
-	err = signingKeyRing.VerifyDetached(message, pgpSignature, crypto.GetUnixTime())
-	if err != nil {
-		log.Fatalln(err)
-		return false
-	}
-	return true
 }

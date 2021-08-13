@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 
@@ -12,6 +11,29 @@ import (
 
 //db 全局数据库对象
 var db *sql.DB
+
+// ReportList
+type ReportList struct {
+	player_uuid string
+	point       float64
+}
+
+// SubList 提交列表
+type SubList struct {
+	uuid        string
+	player_uuid string
+	comment     string
+	point       float64
+	level       int
+}
+
+type ServerList struct {
+	uuid   string
+	name   string
+	pubkey string
+	level  int
+	end    bool
+}
 
 //Init 初始化数据库, 当数据库文件不存在时将创建一个默认的数据库文件
 func init() {
@@ -55,7 +77,8 @@ func InitializeDB() {
     CREATE TABLE IF NOT EXISTS Server(
 		server_name TEXT NULL,
 		uuid TEXT NULL UNIQUE,
-		public_key TEXT NULL
+		public_key TEXT NULL,
+		level INTEGER NULL
 	);
 	`
 	db.Exec(sql_table)
@@ -66,7 +89,27 @@ func InitializeDB() {
 		uuid TEXT NULL,
 		player_uuid TEXT NULL,
 		comment TEXT NULL,
-		point INTEGER NULL
+		point REAL NULL
+	);
+	`
+	db.Exec(sql_table)
+
+	// 表: Config
+	sql_table = `
+    CREATE TABLE IF NOT EXISTS Config(
+		server_name TEXT NULL,
+		private_key TEXT NULL,
+		public_key TEXT NULL,
+		uuid TEXT NULL
+	);
+	`
+	db.Exec(sql_table)
+
+	// 表: Reputation
+	sql_table = `
+    CREATE TABLE IF NOT EXISTS Reputation(
+		player_uuid TEXT NULL UNIQUE,
+		point REAL NULL
 	);
 	`
 	db.Exec(sql_table)
@@ -78,7 +121,11 @@ func registerServer(server_name string, uuid string) error {
 	if err != nil {
 		return errors.New("无法读取本地公钥: " + err.Error())
 	}
-	_, err = db.Exec("INSERT INTO Server (server_name, uuid, public_key) values(?,?,?)", server_name, uuid, pubkey)
+	privkey, err := ioutil.ReadFile("rsa-priv.pem")
+	if err != nil {
+		return errors.New("无法读取本地公钥: " + err.Error())
+	}
+	_, err = db.Exec("INSERT INTO Config (server_name, uuid, private_key, public_key) values(?,?,?,?)", server_name, uuid, privkey, pubkey)
 	if err != nil {
 		return errors.New("本地数据库错误: " + err.Error())
 	}
@@ -86,7 +133,7 @@ func registerServer(server_name string, uuid string) error {
 }
 
 // newSubmission 向数据库中存入提交记录
-func newSubmission(uuid, player_uuid, comment string, point int) error {
+func newSubmission(uuid, player_uuid, comment string, point float64) error {
 	_, err := db.Exec("INSERT INTO Submission (uuid, player_uuid, comment, point) values(?,?,?,?)", uuid, player_uuid, comment, point)
 	if err != nil {
 		return errors.New("本地数据库错误: " + err.Error())
@@ -104,65 +151,115 @@ func deleteSubmission(uuid string) error {
 }
 
 // serverList 吐出数据库Server表中的部分内容
-func serverList(c chan string) error {
-	rows, err := db.Query("SELECT server_name, uuid FROM Server")
+func serverList(c chan ServerList) {
+	rows, err := db.Query("SELECT * FROM Server")
 	if err != nil {
-		return errors.New("本地数据库错误: " + err.Error())
+		close(c)
+		log.Panicf("本地数据库错误: %s\n", err)
+		return
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var data struct {
-			uuid string
-			name string
-		}
-		err := rows.Scan(&data.name, &data.uuid)
+		var data ServerList
+		err := rows.Scan(&data.name, &data.uuid, &data.pubkey, &data.level)
 		if err != nil {
-			return errors.New("本地数据库错误: " + err.Error())
+			close(c)
+			log.Panicf("本地数据库错误: %s\n", err)
+			return
 		}
-		c <- fmt.Sprintf("%s\t|%s", data.uuid, data.name)
+		c <- data
 	}
 	close(c)
-	return nil
+	return
 }
 
 // subList 吐出数据库Submission表中的所有内容
-func subList(c chan string) error {
+func subList(c chan SubList) {
 	rows, err := db.Query("SELECT * FROM Submission")
 	if err != nil {
-		return errors.New("本地数据库错误: " + err.Error())
+		close(c)
+		log.Panicf("本地数据库错误: %s\n", err)
+		return
 	}
 	defer rows.Close()
 
 	for rows.Next() {
-		var data struct {
-			uuid        string
-			player_uuid string
-			comment     string
-			point       int
-		}
+		var data SubList
 		err := rows.Scan(&data.uuid, &data.player_uuid, &data.comment, &data.point)
 		if err != nil {
-			return errors.New("本地数据库错误: " + err.Error())
+			close(c)
+			log.Panicf("本地数据库错误: %s\n", err)
+			return
 		}
-
-		c <- fmt.Sprintf("%s\t|%s\t|   %d\t|%s", data.uuid, data.player_uuid, data.point, data.comment)
+		data.level = 5
+		c <- data
 	}
 	close(c)
-	return nil
+	return
 }
 
 // insertServer 插入新的服务器信息
-func insertServer(uuid, name, pubkey_path string) error {
+func insertServer(uuid, name, pubkey_path string, level int) error {
 	// 读取本地公钥
 	pubkey, err := ioutil.ReadFile(pubkey_path)
 	if err != nil {
 		return errors.New("读取指定公钥错误: " + err.Error())
 	}
 
-	_, err = db.Exec("INSERT INTO Server (server_name, uuid, public_key) values(?,?,?)", name, uuid, string(pubkey))
+	_, err = db.Exec("INSERT INTO Server (server_name, uuid, public_key, level) values(?,?,?,?)", name, uuid, string(pubkey), level)
 	if err != nil {
 		return errors.New("本地数据库错误: " + err.Error())
 	}
+	return nil
+}
+
+// addReputation 插入玩家的声望数据
+func addReputation(data SubList) {
+	// 若表中存在该uuid, 则将将传入的数据与原先的数据相加; 否则插入新行
+	rows := db.QueryRow("SELECT player_uuid FROM Reputation WHERE player_uuid GLOB '?'", data.player_uuid)
+	if rows.Scan().Error() == "" {
+		_, err := db.Exec("UPDATE Reputation SET point = point + ?", (data.point * (float64(data.level) / 5)))
+		if err != nil {
+			log.Panicf("本地数据库错误: %s\n", err)
+			return
+		}
+	} else {
+		_, err := db.Exec("INSERT INTO Reputation (player_uuid, point) values(?,?)", data.player_uuid, (data.point * (float64(data.level) / 5)))
+		if err != nil {
+			log.Panicf("本地数据库错误: %s\n", err)
+			return
+		}
+	}
+
+	return
+}
+
+// resetReputation 重置表Reputation
+func resetReputation() {
+	_, err := db.Exec("delete from Reputation")
+	if err != nil {
+		log.Panicf("本地数据库错误: %s\n", err)
+		return
+	}
+}
+
+// serverList 吐出数据库Server表中的部分内容
+func reportList(c chan ReportList) error {
+	rows, err := db.Query("SELECT * FROM Reputation")
+	if err != nil {
+		return errors.New("本地数据库错误: " + err.Error())
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var data ReportList
+		err := rows.Scan(&data.player_uuid, &data.point)
+		if err != nil {
+			return errors.New("本地数据库错误: " + err.Error())
+		}
+		c <- data
+	}
+	close(c)
 	return nil
 }
