@@ -44,6 +44,11 @@ func main() {
 						Name:  "export",
 						Usage: "更新完成后将结果导出到文件中",
 					},
+					&cli.Float64Flag{
+						Name:  "less",
+						Usage: "只输出小于某值的数据",
+						Value: -0,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					// 显示一个进度条, 防止时间过长
@@ -55,9 +60,18 @@ func main() {
 					c1 := make(chan ReportList)
 					fmt.Println("\t\t玩家uuid\t\t|评分")
 					go reportList(c1)
-					for i := range c1 {
-						fmt.Println(fmt.Sprintf("%s\t|%.1f", i.player_uuid, i.point))
+					if c.Float64("less") != -0 {
+						for i := range c1 {
+							if i.point <= c.Float64("less") {
+								fmt.Println(fmt.Sprintf("%s\t|%.1f", i.player_uuid, i.point))
+							}
+						}
+					} else {
+						for i := range c1 {
+							fmt.Println(fmt.Sprintf("%s\t|%.1f", i.player_uuid, i.point))
+						}
 					}
+
 					log.Println("已到达最底端")
 					return nil
 				},
