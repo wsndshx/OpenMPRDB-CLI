@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
+	"os"
+
 	"log"
 	"net/http"
 	"regexp"
@@ -124,7 +126,7 @@ func getServerData(uuid, pubkey string, level int, c chan SubList) {
 	defer resp.Body.Close()
 
 	// 读取返回值
-	pageBytes, err := ioutil.ReadAll(resp.Body)
+	pageBytes, err := io.ReadAll(resp.Body)
 	if err != nil {
 		log.Panicf("读取返回值错误: %s\n", err)
 		return
@@ -272,4 +274,39 @@ func generateReport() {
 		bar.Add(1)
 	}
 	bar.Add(1)
+}
+
+// 导出banlist到指定文件
+func exportBanList(path string, ch chan string) {
+	type ban struct {
+		UUID    string `json:"uuid"`
+		Created string `json:"created"`
+		Source  string `json:"source"`
+		Expires string `json:"expires"`
+		Reason  string `json:"reason"`
+	}
+	var banList []ban
+	// 这里接收要写入的数据
+	for uuid := range ch {
+		miao := ban{
+			UUID:    uuid,
+			Created: time.Now().Format("2006-01-02 15:04:05 -0700"),
+			Source:  "OpenMPRDB-CLI",
+			Expires: "forever",
+			Reason:  "OpenMPRDB-CLI Ban",
+		}
+		banList = append(banList, miao)
+	}
+	// 写入文件
+	data, err := json.Marshal(banList)
+	if err != nil {
+		log.Panicf("反序列化错误: %s\n", err)
+		return
+	}
+	err = os.WriteFile(path, data, 0644)
+	if err != nil {
+		log.Panicf("文件写入错误: %s\n", err)
+		return
+	}
+	return
 }

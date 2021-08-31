@@ -3,7 +3,8 @@ package main
 import (
 	"database/sql"
 	"errors"
-	"io/ioutil"
+	"os"
+
 	"log"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -51,7 +52,7 @@ func init() {
 	}
 	var err error
 	// charset=utf 用于指示打开/新建文件时使用的字符编码类型
-	db, err = sql.Open("sqlite3", SqlPath+"?charset=utf")
+	db, err = sql.Open("sqlite3", SqlPath+"?charset=utf&cache=shared&mode=memory")
 	if err != nil {
 		log.Fatalf("打开数据库错误: %s", err)
 	}
@@ -66,7 +67,7 @@ func init() {
 //InitializeDB 创建默认数据库
 func InitializeDB() {
 	// 创建数据库文件
-	db, err := sql.Open("sqlite3", SqlPath+"?charset=utf")
+	db, err := sql.Open("sqlite3", SqlPath+"?charset=utf&mode=memory&cache=shared")
 	if err != nil {
 		log.Fatalf("打开数据库错误: %s", err)
 	}
@@ -122,12 +123,12 @@ func InitializeDB() {
 	db.Exec(sql_table)
 
 	// 读取私钥
-	privkey, err := ioutil.ReadFile("rsa-priv.pem")
+	privkey, err := os.ReadFile("rsa-priv.pem")
 	if err != nil {
 		log.Fatalf("获取私钥错误: %s", err)
 	}
 	// 读取公钥
-	pubkey, err := ioutil.ReadFile("rsa-pub.pem")
+	pubkey, err := os.ReadFile("rsa-pub.pem")
 	if err != nil {
 		log.Fatalf("获取公钥错误: %s", err)
 	}
@@ -218,7 +219,7 @@ func subList(c chan SubList) {
 // insertServer 插入新的服务器信息
 func insertServer(uuid, name, pubkey_path string, level int) error {
 	// 读取本地公钥
-	pubkey, err := ioutil.ReadFile(pubkey_path)
+	pubkey, err := os.ReadFile(pubkey_path)
 	if err != nil {
 		return errors.New("读取指定公钥错误: " + err.Error())
 	}

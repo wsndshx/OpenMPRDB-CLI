@@ -2,7 +2,7 @@ package main
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 
 	"github.com/ProtonMail/gopenpgp/v2/crypto"
 	"github.com/ProtonMail/gopenpgp/v2/helper"
@@ -18,14 +18,14 @@ func initializationKey() (err error) {
 
 	// 存储私钥
 	private_key, _ := rsaKey.Armor()
-	err = ioutil.WriteFile("rsa-priv.pem", []byte(private_key), 0644)
+	err = os.WriteFile("rsa-priv.pem", []byte(private_key), 0644)
 	if err != nil {
 		return
 	}
 
 	// 存储公钥
 	public_key, _ := rsaKey.GetArmoredPublicKey()
-	err = ioutil.WriteFile("rsa-pub.pem", []byte(public_key), 0644)
+	err = os.WriteFile("rsa-pub.pem", []byte(public_key), 0644)
 	if err != nil {
 		return
 	}

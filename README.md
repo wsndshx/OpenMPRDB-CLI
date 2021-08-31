@@ -61,10 +61,12 @@ import -uuid cc91e632-5636-4cac-b0b0-6508a35aede4 -pubkey "D:\OpenMPRDB-CLI\rsa-
 ### 根据本地提交数据和导入的其他服务器提交数据生成玩家声誉报告(默认列出所有玩家)
 
 ```shell
-OpenMPRDB-CLI update
+OpenMPRDB-CLI update -less "-0.1" -export "./banned-players.json"
 ```
 
 - `less` 只输出小于等于该值的玩家
+
+- `export` 将结果导出到指定文件(输出格式为[该页](https://minecraft.fandom.com/de/wiki/Befehl/ban)所定义的格式)
 
 ### 列表
 

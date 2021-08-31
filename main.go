@@ -4,7 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"time"
+
 	"log"
 	"net/http"
 	"os"
@@ -33,6 +34,7 @@ func main() {
 					&cli.StringFlag{
 						Name:  "export",
 						Usage: "更新完成后将结果导出到文件中",
+						Value: "",
 					},
 					&cli.Float64Flag{
 						Name:  "less",
@@ -43,25 +45,39 @@ func main() {
 				Action: func(c *cli.Context) error {
 					// 显示一个进度条, 防止时间过长
 					bar = progressbar.Default(1)
+					bar.ChangeMax(0)
 					// 生成数据
 					generateReport()
 
 					// 输出一下
 					c1 := make(chan ReportList)
+					c2 := make(chan string)
+					var export bool = false
+					if c.String("export") != "" {
+						export = true
+						go exportBanList(c.String("export"), c2)
+					}
 					fmt.Println("\t\t玩家uuid\t\t|评分")
 					go reportList(c1)
 					if c.Float64("less") != -0 {
 						for i := range c1 {
 							if i.point <= c.Float64("less") {
 								fmt.Println(fmt.Sprintf("%s\t|%.1f", i.player_uuid, i.point))
+								if export {
+									c2 <- i.player_uuid
+								}
 							}
 						}
 					} else {
 						for i := range c1 {
 							fmt.Println(fmt.Sprintf("%s\t|%.1f", i.player_uuid, i.point))
+							if export {
+								c2 <- i.player_uuid
+							}
 						}
 					}
-
+					close(c2)
+					time.Sleep(1)
 					log.Println("已到达最底端")
 					return nil
 				},
@@ -264,7 +280,7 @@ func httpRequest(method, Type, API string, data io.Reader) ([]byte, error) {
 	defer res.Body.Close()
 
 	//读取返回的内容
-	pageBytes, err := ioutil.ReadAll(res.Body)
+	pageBytes, err := io.ReadAll(res.Body)
 	if err != nil {
 		return nil, errors.New("读取返回值错误: " + err.Error())
 	}
