@@ -22,9 +22,11 @@ go build
 ### 注册
 
 ```shell
-OpenMPRDB-CLI -register --server_name Neko
+OpenMPRDB-CLI register -server_name Neko -remote "https://test.openmprdb.org"
 ```
 - `server_name` 服务器名称
+
+- `remote` 服务器地址
 
 ### 提交新声望数据
 

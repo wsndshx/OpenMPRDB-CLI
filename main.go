@@ -15,7 +15,6 @@ import (
 )
 
 var SqlPath string = "./OpenMPRDB.db"
-var serverAddress string = "https://test.openmprdb.org"
 var bar *progressbar.ProgressBar
 
 func init() {
@@ -157,16 +156,22 @@ func main() {
 						Usage:    "The name of the server.",
 						Required: true,
 					},
+					&cli.StringFlag{
+						Name:     "remote",
+						Value:    "OpenMPRDB-CLI_test",
+						Usage:    "The address of the server.",
+						Required: true,
+					},
 				},
 				Action: func(c *cli.Context) error {
 					// 在中心服务器上注册本客户端(服务器)
-					server_uuid, err := register(c.String("server_name"))
+					server_uuid, err := register(c.String("server_name"), c.String("remote"))
 					if err != nil {
 						return err
 					}
 
 					// 在数据库中存储数据
-					err = registerServer(c.String("server_name"), server_uuid)
+					err = registerServer(c.String("server_name"), server_uuid, c.String("remote"))
 					if err != nil {
 						return err
 					}
@@ -270,7 +275,7 @@ func Exists(path string) bool {
 }
 
 // httpRequest 向指定接口以指定方法发送数据, 返回得到的内容
-func httpRequest(method, Type, API string, data io.Reader) ([]byte, error) {
+func httpRequest(method, Type, serverAddress, API string, data io.Reader) ([]byte, error) {
 	req, _ := http.NewRequest(method, serverAddress+API, data)
 	req.Header.Add("Content-Type", Type)
 	res, err := http.DefaultClient.Do(req)

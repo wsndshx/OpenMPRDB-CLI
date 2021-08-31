@@ -20,7 +20,7 @@ import (
 )
 
 // register 在中心服务器上注册本服务器
-func register(server_name string) (string, error) {
+func register(server_name, server_address string) (string, error) {
 	// 生成请求内容
 	register := make(map[string]string)
 	message, err := SignatureData("server_name: " + server_name)
@@ -37,7 +37,7 @@ func register(server_name string) (string, error) {
 	bytesData, _ := json.Marshal(register)
 
 	// PUT请求 [服务器地址]/v1/server/register
-	req, err := httpRequest("PUT", "application/json", "/v1/server/register", bytes.NewBuffer(bytesData))
+	req, err := httpRequest("PUT", "application/json", server_address, "/v1/server/register", bytes.NewBuffer(bytesData))
 	var data struct {
 		Status string `json:"status"`
 		UUID   string `json:"uuid"`
@@ -60,13 +60,18 @@ func register(server_name string) (string, error) {
 func newSubmit(player, comment string, point float64) (string, error) {
 	// 生成请求数据
 	message, err := SignatureData(fmt.Sprintf("uuid: %s\r\ntimestamp: %d\r\nplayer_uuid: %s\r\npoints: %.1f\r\ncomment: %s", uuid.Must(uuid.NewV4(), nil).String(), time.Now().Unix(), player, point, comment))
-
 	if err != nil {
 		return "", err
 	}
 
+	var serverAddress string
+	err = db.QueryRow("SELECT server_Address FROM Config").Scan(&serverAddress)
+	if err != nil {
+		return "", errors.New("无法读取远程服务器地址: " + err.Error())
+	}
+
 	// PUT请求: [API服务器地址]/v1/submit/new
-	req, err := httpRequest("PUT", "text/plain", "/v1/submit/new", bytes.NewBufferString(message))
+	req, err := httpRequest("PUT", "text/plain", serverAddress, "/v1/submit/new", bytes.NewBufferString(message))
 	var data struct {
 		Status string `json:"status"`
 		UUID   string `json:"uuid"`
@@ -93,8 +98,14 @@ func deleteSubmit(uuid, comment string) error {
 		return err
 	}
 
+	var serverAddress string
+	err = db.QueryRow("SELECT server_Address FROM Config").Scan(&serverAddress)
+	if err != nil {
+		return errors.New("无法读取远程服务器地址: " + err.Error())
+	}
+
 	// PUT请求: [API服务器地址]/v1/submit/uuid/<submit_uuid>
-	req, err := httpRequest("DELETE", "text/plain", "/v1/submit/uuid/"+uuid, bytes.NewBufferString(message))
+	req, err := httpRequest("DELETE", "text/plain", serverAddress, "/v1/submit/uuid/"+uuid, bytes.NewBufferString(message))
 	if err != nil {
 		return err
 	}
@@ -117,6 +128,12 @@ func deleteSubmit(uuid, comment string) error {
 
 // getServerData 获取指定服务器的数据
 func getServerData(uuid, pubkey string, level int, c chan SubList) {
+	var serverAddress string
+	err := db.QueryRow("SELECT server_Address FROM Config").Scan(&serverAddress)
+	if err != nil {
+		log.Panicln(errors.New("无法读取远程服务器地址: " + err.Error()))
+		return
+	}
 	// GET请求: [API服务器地址]/v1/submit/server/<server_uuid>
 	resp, err := http.Get(serverAddress + "/v1/submit/server/" + uuid)
 	if err != nil {

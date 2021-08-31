@@ -106,6 +106,7 @@ func InitializeDB() {
 	sql_table = `
     CREATE TABLE IF NOT EXISTS Config(
 		server_name TEXT NULL,
+		server_address TEXT NULL,
 		private_key TEXT NULL,
 		public_key TEXT NULL,
 		uuid TEXT NULL
@@ -141,8 +142,8 @@ func InitializeDB() {
 }
 
 // registerServer 存储注册服务器时返回的uuid和服务器名称
-func registerServer(server_name string, uuid string) error {
-	_, err := db.Exec("UPDATE Config SET server_name = ?, uuid = ?", server_name, uuid)
+func registerServer(server_name string, uuid string, server_address string) error {
+	_, err := db.Exec("UPDATE Config SET server_name = ?, uuid = ?, server_address = ?", server_name, uuid, server_address)
 	if err != nil {
 		return errors.New("本地数据库错误: " + err.Error())
 	}
